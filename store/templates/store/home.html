@@ -1,0 +1,283 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechNova | Technology Store</title>
+    <link rel="stylesheet" href="{% static 'store/style.css' %}">
+</head>
+<body>
+
+
+<header class="navbar">
+    <a href="{% url 'store:home' %}" class="logo">
+        TechNova<span>.</span>
+    </a>
+
+    <nav>
+        <a href="{% url 'store:home' %}">Home</a>
+        <a href="#categories">Categories</a>
+        <a href="#products">Products</a>
+    </nav>
+   
+
+    <a href="{% url 'store:cart' %}" class="cart-button">
+        Cart ({{ cart_count|default:0 }})
+    </a>
+     <div class="it">
+    
+    {% if user.is_authenticated %}
+        <form method="post" action="{% url 'store:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="reset-button">Log out</button>
+        </form>
+    {% else %}
+    
+        <a href="{% url 'store:login' %}" class="reset-button">
+            Log in
+        </a>
+        <a href="{% url 'store:register' %}" class="reset-button">
+            Register
+        </a>
+        </div>
+    {% endif %}
+</header>
+
+{% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <p class="message {{ message.tags }}">{{ message }}</p>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">DISCOVER THE LATEST TECH</p>
+        <h1>Technology for<br>your everyday life.</h1>
+
+        <p class="hero-description">
+            Explore laptops, smartphones, tablets, headphones and more
+            at TechNova.
+        </p>
+
+        <a href="#products" class="primary-button">
+            Shop Products →
+        </a>
+    </div>
+
+    <div class="image-placeholder">
+        <span>YOUR NEXT<br>TECH UPGRADE</span>
+    </div>
+</section>
+
+<section class="section" id="categories">
+    <p class="eyebrow">EXPLORE OUR STORE</p>
+    <h2>Shop by Category</h2>
+
+    <div class="category-grid">
+        {% for category in categories %}
+            <a
+                class="category-card"
+                href="{% url 'store:home' %}?category={{ category.slug }}#products"
+            >
+                <h3>{{ category.name }}</h3>
+                <p>Explore products →</p>
+            </a>
+        {% empty %}
+            <p>Categories will appear here soon.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section products" id="products">
+    <p class="eyebrow">OUR COLLECTION</p>
+    <h2>Find Your Next Device</h2>
+
+    <div class="catalog-layout">
+        <aside class="filter-sidebar">
+            <h3>Filters</h3>
+
+            <form
+                method="get"
+                action="{% url 'store:home' %}#products"
+                class="filter-form"
+            >
+                <label for="q">Search products</label>
+                <input
+                    type="search"
+                    id="q"
+                    name="q"
+                    placeholder="Search products..."
+                    value="{{ search }}"
+                >
+
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                    <option value="">All categories</option>
+                    {% for item in categories %}
+                        <option
+                            value="{{ item.slug }}"
+                            {% if selected_category == item.slug %}selected{% endif %}
+                        >
+                            {{ item.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <label for="brand">Brand</label>
+                <select id="brand" name="brand">
+                    <option value="">All brands</option>
+                    {% for item in brands %}
+                        <option
+                            value="{{ item }}"
+                            {% if selected_brand == item %}selected{% endif %}
+                        >
+                            {{ item }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <label>Price range (₾)</label>
+                <div class="price-inputs">
+                    <input
+                        type="number"
+                        name="min_price"
+                        min="0"
+                        step="0.01"
+                        placeholder="Min"
+                        value="{{ min_price }}"
+                    >
+                    <input
+                        type="number"
+                        name="max_price"
+                        min="0"
+                        step="0.01"
+                        placeholder="Max"
+                        value="{{ max_price }}"
+                    >
+                </div>
+
+                <label for="rating">Minimum rating</label>
+                <select id="rating" name="rating">
+                    <option value="">Any rating</option>
+                    <option value="4" {% if min_rating == "4" %}selected{% endif %}>
+                        4+ stars
+                    </option>
+                    <option value="3" {% if min_rating == "3" %}selected{% endif %}>
+                        3+ stars
+                    </option>
+                    <option value="2" {% if min_rating == "2" %}selected{% endif %}>
+                        2+ stars
+                    </option>
+                    <option value="1" {% if min_rating == "1" %}selected{% endif %}>
+                        1+ star
+                    </option>
+                </select>
+
+                <button type="submit" class="filter-button">
+                    Apply Filters
+                </button>
+
+                <a
+                    href="{% url 'store:home' %}#products"
+                    class="reset-button"
+                >
+                    Clear Filters
+                </a>
+            </form>
+        </aside>
+
+        <div class="catalog-results">
+            <div class="product-grid">
+                {% for product in products %}
+                    <article class="product-card">
+
+                        <a
+                            href="{% url 'store:product_detail' product.id %}"
+                            class="product-image product-image-link"
+                        >
+                            {% if product.image %}
+                                <img
+                                    src="{{ product.image }}"
+                                    alt="{{ product.name }}"
+                                >
+                            {% else %}
+                                <span>No image available</span>
+                            {% endif %}
+                        </a>
+
+                        <div class="product-info">
+                            <p class="product-category">
+                                {{ product.category.name }}
+                            </p>
+
+                            <h3>
+                                <a href="{% url 'store:product_detail' product.id %}">
+                                    {{ product.name }}
+                                </a>
+                            </h3>
+
+                            <p class="brand">{{ product.brand }}</p>
+
+                            <p class="rating">
+                                ★ {{ product.average_rating|floatformat:1 }} / 5
+                            </p>
+
+                            <p class="price">
+                                ₾{{ product.price|floatformat:2 }}
+                            </p>
+
+                            {% if product.stock > 0 %}
+                                <p class="stock">
+                                    In stock: {{ product.stock }}
+                                </p>
+
+                                <form
+                                    method="post"
+                                    action="{% url 'store:add_to_cart' product.id %}"
+                                >
+                                    {% csrf_token %}
+                                    <button type="submit" class="add-button">
+                                        Add to Cart
+                                    </button>
+                                </form>
+                            {% else %}
+                                <p class="out-of-stock">Out of stock</p>
+                                <button class="add-button" disabled>
+                                    Unavailable
+                                </button>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% empty %}
+                    <div class="no-products">
+                        <h3>No products found</h3>
+                        <p>Try another search or change your filters.</p>
+
+                        <a
+                            href="{% url 'store:home' %}#products"
+                            class="reset-button"
+                        >
+                            View all products
+                        </a>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="footer">
+    <a href="{% url 'store:home' %}" class="logo">
+        TechNova<span>.</span>
+    </a>
+
+    <p>Your destination for modern technology.</p>
+    <p class="copyright">© 2026 TechNova</p>
+</footer>
+
+</body>
+</html>

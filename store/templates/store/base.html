@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechNova Store</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'store/style.css' %}">
+</head>
+<body>
+    <header class="navbar">
+        <a href="{% url 'store:home' %}" class="logo">TechNova<span>.</span></a>
+       <a href="{% url 'store:cart' %}" class="cart-button">
+    Cart ({{ cart_count|default:0 }})
+</a>
+    </header>
+
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+</body>
+</html>

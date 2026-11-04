@@ -1,0 +1,141 @@
+
+{% extends "store/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<section class="section">
+    <p class="eyebrow">CHECKOUT</p>
+    <h1>Complete Your Order</h1>
+
+    {% if messages %}
+        {% for message in messages %}
+            <p class="message">{{ message }}</p>
+        {% endfor %}
+    {% endif %}
+
+    <div class="auth-card"
+         style="max-width: 100%; margin: 20px 0; padding: 20px;">
+
+        <h3>Order Summary</h3>
+
+        <ul style="list-style: none; padding: 0; margin-bottom: 20px;">
+            {% for item in items %}
+                <li style="display: flex; justify-content: space-between;
+                           padding: 10px 0; border-bottom: 1px solid #e7eaf0;">
+                    <span>{{ item.product.name }} (x{{ item.quantity }})</span>
+                    <strong>₾{{ item.subtotal|floatformat:2 }}</strong>
+                </li>
+            {% empty %}
+                <li>Your cart is empty.</li>
+            {% endfor %}
+        </ul>
+
+        <h2>Total: ₾{{ total|floatformat:2 }}</h2>
+
+        <form method="POST" style="margin-top: 20px;">
+            {% csrf_token %}
+
+            <button type="submit" class="primary-button">
+                Place Order
+            </button>
+
+            <a href="{% url 'store:cart' %}"
+               class="reset-button"
+               style="margin-left: 10px;">
+                Back to Cart
+            </a>
+        </form>
+    </div>
+</section>
+
+<div id="order-success-modal" class="success-overlay">
+    <div class="success-modal">
+        <div class="success-icon">✓</div>
+        <h2>Order Successful!</h2>
+        <p>Your order has been placed successfully.</p>
+        <p class="redirect-text">Redirecting to home page...</p>
+    </div>
+</div>
+
+<style>
+    
+    .success-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: rgba(15, 23, 42, 0.65);
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .success-modal {
+        width: 100%;
+        max-width: 400px;
+        padding: 35px 25px;
+        border-radius: 20px;
+        background: white;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        animation: modal-appear 0.3s ease-out;
+    }
+
+    .success-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 75px;
+        height: 75px;
+        margin: 0 auto 20px;
+        border-radius: 50%;
+        background: #dcfce7;
+        color: #16a34a;
+        font-size: 42px;
+        font-weight: bold;
+    }
+
+    .success-modal h2 {
+        margin-bottom: 12px;
+        color: #166534;
+    }
+
+    .success-modal p {
+        color: #475569;
+        margin-bottom: 10px;
+    }
+
+    .success-modal .redirect-text {
+        margin-top: 20px;
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    @keyframes modal-appear {
+        from {
+            opacity: 0;
+            transform: translateY(15px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+</style>
+
+{% if order_success %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const modal = document.getElementById("order-success-modal");
+
+        modal.style.display = "flex";
+
+        setTimeout(function () {
+            window.location.href = "{% url 'store:home' %}";
+        }, 2500);
+    });
+</script>
+{% endif %}
+
+{% endblock %}
