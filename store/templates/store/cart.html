@@ -1,72 +1,105 @@
+
 {% extends "store/base.html" %}
 {% load static %}
 
 {% block content %}
 <section class="section">
+
     <p class="eyebrow">YOUR ORDER</p>
     <h1>Shopping Cart</h1>
-    
+
     {% if messages %}
         {% for message in messages %}
             <p class="message">{{ message }}</p>
         {% endfor %}
     {% endif %}
 
-    {% for item in items %}
-        <article class="product-card cart-card">
-            {% if item.product.image %}
-                <img src="{{ item.product.image }}" alt="{{ item.product.name }}" width="150">
-            {% endif %}
-            <div class="product-info">
-                <h2><a href="{% url 'store:product_detail' item.product.id %}">{{ item.product.name }}</a></h2>
-                <p>Brand: {{ item.product.brand }}</p>
-                <p>Stock: {{ item.product.stock }}</p>
-                <p>Rating: {{ item.product.average_rating|floatformat:1 }} / 5</p>
-                <p>Reviews: {{ item.product.reviews.count }}</p>
-                <p>Price: ₾{{ item.product.price|floatformat:2 }}</p>
-                <div class="quantity-controls">
-                    {% if item.quantity > 1 %}
-                        <form method="post" action="{% url 'store:update_cart' item.product.id %}">
-                            {% csrf_token %}
-                            <button type="submit" name="action" value="decrease" aria-label="Decrease quantity">−</button>
-                        </form>
-                    {% endif %}
-                    <span>{{ item.quantity }}</span>
-                    {% if item.quantity < item.product.stock %}
-                        <form method="post" action="{% url 'store:update_cart' item.product.id %}">
-                            {% csrf_token %}
-                            <button type="submit" name="action" value="increase" aria-label="Increase quantity">+</button>
-                        </form>
-                    {% endif %}
-                </div>
-                <p class="price">Subtotal: ₾{{ item.subtotal|floatformat:2 }}</p>
-                <form method="post" action="{% url 'store:remove_from_cart' item.product.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="delete-button">Remove</button>
-                </form>
-            </div>
-        </article>
-    {% empty %}
-        <p>Your cart is empty.</p>
-    {% endfor %}
-
     {% if items %}
+        {% for item in items %}
+            <article class="product-card cart-card">
+
+                {% if item.product.image %}
+                    <img src="{{ item.product.image }}"
+                         alt="{{ item.product.name }}"
+                         width="150">
+                {% endif %}
+
+                <div class="product-info">
+                    <h2>
+                        <a href="{% url 'store:product_detail' item.product.id %}">
+                            {{ item.product.name }}
+                        </a>
+                    </h2>
+
+                    <p>Brand: {{ item.product.brand }}</p>
+                    <p>Stock: {{ item.product.stock }}</p>
+                    <p>Rating: {{ item.product.average_rating|floatformat:1 }} / 5</p>
+                    <p>Reviews: {{ item.product.reviews.count }}</p>
+                    <p>Price: ₾{{ item.product.price|floatformat:2 }}</p>
+
+                   <div class="quantity-controls">
+
+    <!-- დაკლება -->
+    {% if item.quantity > 1 %}
+        <form method="POST" action="{% url 'store:update_cart' item.product.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="decrease">
+            <button type="submit">−</button>
+        </form>
+    {% endif %}
+
+    <!-- რაოდენობა -->
+    <span>{{ item.quantity }}</span>
+
+    <!-- მომატება -->
+    {% if item.quantity < item.product.stock %}
+        <form method="POST" action="{% url 'store:update_cart' item.product.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="increase">
+            <button type="submit">+</button>
+        </form>
+    {% endif %}
+
+</div>
+
+                    <p class="price">
+                        Subtotal: ₾{{ item.subtotal|floatformat:2 }}
+                    </p>
+
+                    <form method="post" action="{% url 'store:remove_from_cart' item.product.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="delete-button">Remove</button>
+                    </form>
+                </div>
+            </article>
+        {% endfor %}
+
         <h2>Total: ₾{{ total|floatformat:2 }}</h2>
 
         <div style="margin-top: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
             {% if user.is_authenticated %}
-                <a href="{% url 'store:checkout' %}" class="primary-button">Submit Order</a>
+                <a href="{% url 'store:checkout' %}" class="primary-button">
+                    Submit Order
+                </a>
             {% else %}
-                <div style="background: #fff3cd; color: #856404; padding: 12px 16px; border-radius: 8px; border: 1px solid #ffeeba;">
-                    <span>Please log in to submit your order.</span>
-                    <a href="{% url 'store:login' %}?next={% url 'store:cart' %}" class="primary-button" style="margin-left: 10px;">Login to Order</a>
-                </div>
+                <a href="{% url 'store:login' %}?next={% url 'store:cart' %}"
+                   class="primary-button">
+                    Login to Order
+                </a>
             {% endif %}
 
-            <a href="{% url 'store:home' %}" class="reset-button">Continue Shopping</a>
+            <a href="{% url 'store:home' %}" class="reset-button">
+                Continue Shopping
+            </a>
         </div>
+
     {% else %}
-        <a href="{% url 'store:home' %}" class="primary-button">Continue Shopping</a>
+        <p>Your cart is empty.</p>
+
+        <a href="{% url 'store:home' %}" class="primary-button">
+            Continue Shopping
+        </a>
     {% endif %}
+
 </section>
 {% endblock %}

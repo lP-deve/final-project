@@ -1,3 +1,4 @@
+
 {% extends "store/base.html" %}
 
 {% block content %}
@@ -11,191 +12,297 @@
 {% endif %}
 
 <div class="product-detail-container" style="max-width: 900px; margin: 0 auto; padding: 20px;">
-    
-    
+
     <div class="product-main-info" style="display: flex; gap: 30px; margin-bottom: 30px; flex-wrap: wrap;">
-        
-       
+
         <div class="product-images" style="flex: 1; min-width: 280px;">
             {% if product.image %}
-                <img src="{{ product.image }}" alt="{{ product.name }}" style="width: 100%; border-radius: 10px; object-fit: cover;">
+                <img src="{{ product.image }}"
+                     alt="{{ product.name }}"
+                     style="width: 100%; border-radius: 10px; object-fit: cover;">
             {% else %}
-                <div style="width: 100%; height: 280px; background: #eee; display: flex; align-items: center; justify-content: center; border-radius: 10px;">სურათი არ არის</div>
+                <div style="width: 100%; height: 280px; background: #eee; display: flex; align-items: center; justify-content: center; border-radius: 10px;">
+                    სურათი არ არის
+                </div>
             {% endif %}
         </div>
 
-       
         <div class="product-summary" style="flex: 1; min-width: 280px;">
-            <h1>{{ product.name }}</h1>
-            
-            <p style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;">ფასი: {{ product.price }} ₾</p>
-            
-            <p><strong>ბრენდი:</strong> {{ product.brand|default:"მითითებული არ არის" }}</p>
-            <p><strong>გამოშვების თარიღი:</strong> {{ product.release_date|date:"d M Y"|default:"მითითებული არ არის" }}</p>
-            <p><strong>საწყობში დარჩენილი რაოდენობა:</strong> {{ product.stock }} ცალი</p>
 
-            <div class="actions" style="margin-top: 20px; display: flex; gap: 10px;">
-             
-                <button type="button" onclick="openReviewModal()" style="padding: 10px 20px; background-color: #f39c12; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            <h1>{{ product.name }}</h1>
+
+            <p style="font-size: 1.5rem; font-weight: bold; color: #2c3e50;">
+                ფასი: {{ product.price }} ₾
+            </p>
+
+            <p><strong>ბრენდი:</strong> {{ product.brand|default:"მითითებული არ არის" }}</p>
+
+            <p>
+                <strong>გამოშვების თარიღი:</strong>
+                {{ product.release_date|date:"d M Y"|default:"მითითებული არ არის" }}
+            </p>
+
+            <p>
+                <strong>საწყობში დარჩენილი რაოდენობა:</strong>
+                {{ product.stock }} ცალი
+            </p>
+
+            <div class="actions" style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+
+                <button type="button"
+                        onclick="openReviewModal()"
+                        style="padding: 10px 20px; background-color: #f39c12; color: white; border: none; border-radius: 5px; cursor: pointer;">
                     ★ შეფასება
                 </button>
 
-            
-                <form action="{% url 'store:add_to_cart' product.id %}" method="POST" style="margin: 0;">
-                    {% csrf_token %}
-                    <button type="submit" style="padding: 10px 20px; background-color: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;" {% if product.stock <= 0 %}disabled{% endif %}>
-                         კალათაში დამატება
-                    </button>
-                </form>
+                {% if user.is_authenticated %}
+
+                    {% if product.stock > 0 %}
+                        <form method="POST"
+                              action="{% url 'store:add_to_cart' product.id %}">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    style="padding: 10px 20px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                კალათაში დამატება
+                            </button>
+                        </form>
+                    {% else %}
+                        <button type="button" disabled
+                                style="padding: 10px 20px; background-color: #999; color: white; border: none; border-radius: 5px;">
+                            მარაგში არ არის
+                        </button>
+                    {% endif %}
+
+                {% else %}
+
+                    <a href="{% url 'store:login' %}?next={{ request.path|urlencode }}"
+                       style="padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                        ავტორიზაცია კალათაში დასამატებლად
+                    </a>
+
+                {% endif %}
+
             </div>
         </div>
     </div>
 
-    
     <div class="tabs-header" style="border-bottom: 2px solid #ccc; display: flex; gap: 10px; margin-bottom: 20px;">
-        <button class="tab-btn active" onclick="switchTab(event, 'details-tab')" style="padding: 10px 20px; font-weight: bold; border: none; background: none; border-bottom: 3px solid #3498db; cursor: pointer;">
+
+        <button class="tab-btn active"
+                onclick="switchTab(event, 'details-tab')"
+                style="padding: 10px 20px; font-weight: bold; border: none; background: none; border-bottom: 3px solid #3498db; cursor: pointer;">
             Details
         </button>
-        <button class="tab-btn" onclick="switchTab(event, 'reviews-tab')" style="padding: 10px 20px; font-weight: bold; border: none; background: none; border-bottom: 3px solid transparent; cursor: pointer;">
+
+        <button class="tab-btn"
+                onclick="switchTab(event, 'reviews-tab')"
+                style="padding: 10px 20px; font-weight: bold; border: none; background: none; border-bottom: 3px solid transparent; cursor: pointer;">
             Review ({{ review_count }})
         </button>
+
     </div>
 
-  
     <div id="details-tab" class="tab-content" style="display: block;">
         <h3>ნაწარმის დეტალური ინფორმაცია</h3>
         <p>{{ product.description|linebreaksbr }}</p>
     </div>
 
-  
     <div id="reviews-tab" class="tab-content" style="display: none;">
+
         <h3>მომხმარებელთა შეფასებები</h3>
 
         {% if review_count > 0 %}
             <p style="font-size: 1.1rem;">
-                ⭐ <strong>{{ average_rating|floatformat:1 }} / 5</strong> — სულ {{ review_count }} შეფასება
+                ⭐ <strong>{{ average_rating|floatformat:1 }} / 5</strong>
+                — სულ {{ review_count }} შეფასება
             </p>
         {% endif %}
 
         {% for review in reviews %}
-<article style="padding: 15px 0; border-bottom: 1px solid #ddd; position: relative;">
-        <h4>{{ review.first_name }} {{ review.last_name }}</h4>
-        <p>
-            <span style="color: #f5a623;">
-                {% for star in "12345" %}
-                    {% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}
-                {% endfor %}
-            </span>
-            ({{ review.rating }}/5)
-        </p>
-        {% if review.comment %}
-            <p>{{ review.comment|linebreaksbr }}</p>
-        {% endif %}
-        <small style="color: #777;">{{ review.created_at|date:"d M Y, H:i" }}</small>
 
-        {% if user.is_authenticated and review.user == user %}
-            <form action="{% url 'store:delete_review' review.id %}" method="POST" style="display: inline-block; margin-top: 10px;" onsubmit="return confirm('ნამდვილად გსურთ შეფასების წაშლა?');">
-                {% csrf_token %}
-                <button type="submit" style="background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
-                    წაშლა
-                </button>
-            </form>
-        {% endif %}
-    </article>
+            <article style="padding: 15px 0; border-bottom: 1px solid #ddd; position: relative;">
+
+                <h4>{{ review.first_name }} {{ review.last_name }}</h4>
+
+                <p>
+                    <span style="color: #f5a623;">
+                        {% for star in "12345" %}
+                            {% if forloop.counter <= review.rating %}
+                                ★
+                            {% else %}
+                                ☆
+                            {% endif %}
+                        {% endfor %}
+                    </span>
+                    ({{ review.rating }}/5)
+                </p>
+
+                {% if review.comment %}
+                    <p>{{ review.comment|linebreaksbr }}</p>
+                {% endif %}
+
+                <small style="color: #777;">
+                    {{ review.created_at|date:"d M Y, H:i" }}
+                </small>
+
+                {% if user.is_authenticated and review.user == user %}
+                    <form action="{% url 'store:delete_review' review.id %}"
+                          method="POST"
+                          style="display: inline-block; margin-top: 10px;"
+                          onsubmit="return confirm('ნამდვილად გსურთ შეფასების წაშლა?');">
+
+                        {% csrf_token %}
+
+                        <button type="submit"
+                                style="background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">
+                            წაშლა
+                        </button>
+
+                    </form>
+                {% endif %}
+
+            </article>
+
         {% empty %}
             <p>ამ ნივთზე შეფასებები ჯერ არ არის.</p>
         {% endfor %}
+
     </div>
 
 </div>
 
 
-<div id="reviewModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
-    <div class="modal-content" style="background-color: #fff; padding: 25px; border-radius: 8px; width: 100%; max-width: 450px; position: relative;">
-        
-        <span onclick="closeReviewModal()" style="position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer;">&times;</span>
-        
+<!-- Review Modal -->
+
+<div id="reviewModal"
+     class="modal"
+     style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+
+    <div class="modal-content"
+         style="background-color: #fff; padding: 25px; border-radius: 8px; width: 90%; max-width: 450px; position: relative;">
+
+        <span onclick="closeReviewModal()"
+              style="position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer;">
+            &times;
+        </span>
+
         <h3 style="margin-top: 0;">ნივთის შეფასება</h3>
 
         {% if user.is_authenticated %}
+
             <form method="POST" action="{% url 'store:add_review' product.id %}">
+
                 {% csrf_token %}
 
                 <div style="margin-bottom: 15px;">
-                    <label for="first_name" style="display: block; margin-bottom: 5px;">სახელი:</label>
-                    <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <label for="first_name">სახელი:</label>
+                    <input type="text"
+                           id="first_name"
+                           name="first_name"
+                           value="{{ user.first_name }}"
+                           required
+                           style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
                 </div>
 
-             
                 <div style="margin-bottom: 15px;">
-                    <label for="last_name" style="display: block; margin-bottom: 5px;">გვარი:</label>
-                    <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <label for="last_name">გვარი:</label>
+                    <input type="text"
+                           id="last_name"
+                           name="last_name"
+                           value="{{ user.last_name }}"
+                           required
+                           style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
                 </div>
 
-           
                 <div style="margin-bottom: 15px;">
-                    <label for="rating" style="display: block; margin-bottom: 5px;">Rating:</label>
-                    <select id="rating" name="rating" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <label for="rating">Rating:</label>
+                    <select id="rating"
+                            name="rating"
+                            required
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+
                         <option value="">აირჩიეთ რეიტინგი</option>
                         <option value="5">★★★★★ (5/5)</option>
                         <option value="4">★★★★☆ (4/5)</option>
                         <option value="3">★★★☆☆ (3/5)</option>
                         <option value="2">★★☆☆☆ (2/5)</option>
                         <option value="1">★☆☆☆☆ (1/5)</option>
+
                     </select>
                 </div>
 
-                
                 <div style="margin-bottom: 20px;">
-                    <label for="comment" style="display: block; margin-bottom: 5px;">კომენტარი:</label>
-                    <textarea id="comment" name="comment" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"></textarea>
+                    <label for="comment">კომენტარი:</label>
+                    <textarea id="comment"
+                              name="comment"
+                              rows="3"
+                              style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"></textarea>
                 </div>
 
-               
-                <button type="submit" style="width: 100%; padding: 10px; background-color: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                <button type="submit"
+                        style="width: 100%; padding: 10px; background-color: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                     OK
                 </button>
+
             </form>
+
         {% else %}
+
             <p>შეფასების დასატოვებლად საჭიროა ავტორიზაცია.</p>
-            <a href="{% url 'store:login' %}?next={{ request.path|urlencode }}" style="display: inline-block; padding: 8px 15px; background: #3498db; color: white; text-decoration: none; border-radius: 4px;">ავტორიზაცია</a>
+
+            <a href="{% url 'store:login' %}?next={{ request.path|urlencode }}"
+               style="display: inline-block; padding: 8px 15px; background: #3498db; color: white; text-decoration: none; border-radius: 4px;">
+                ავტორიზაცია
+            </a>
+
         {% endif %}
+
     </div>
 </div>
 
+
 <script>
-  
+
     function switchTab(evt, tabId) {
+
         let contents = document.getElementsByClassName("tab-content");
+
         for (let i = 0; i < contents.length; i++) {
             contents[i].style.display = "none";
         }
 
         let buttons = document.getElementsByClassName("tab-btn");
+
         for (let i = 0; i < buttons.length; i++) {
             buttons[i].style.borderBottom = "3px solid transparent";
         }
 
         document.getElementById(tabId).style.display = "block";
+
         evt.currentTarget.style.borderBottom = "3px solid #3498db";
     }
 
-    
+
     function openReviewModal() {
         document.getElementById("reviewModal").style.display = "flex";
     }
+
 
     function closeReviewModal() {
         document.getElementById("reviewModal").style.display = "none";
     }
 
-   
+
     window.onclick = function(event) {
+
         let modal = document.getElementById("reviewModal");
+
         if (event.target === modal) {
             modal.style.display = "none";
         }
+
     }
+
 </script>
 
 {% endblock %}

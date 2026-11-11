@@ -1,15 +1,17 @@
+
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
-from .models import Review
-from .models import Category, Product, Review
+
+from .models import Category, Product, Review, Cart, CartItem
+
 
 
 @login_required(login_url="store:login")
@@ -22,26 +24,17 @@ def delete_review(request, review_id):
         review.delete()
         messages.success(request, "თქვენი შეფასება წარმატებით წაიშალა!")
         return redirect("store:product_detail", product_id=product_id)
-    else:
-        messages.error(request, "თქვენ არ გაქვთ ამ შეფასების წაშლის უფლება.")
-        return redirect("store:product_detail", product_id=review.product.id)
 
-def get_cart_count(request):
-    cart_data = request.session.get("cart", {})
-    count = 0
+    messages.error(request, "თქვენ არ გაქვთ ამ შეფასების წაშლის უფლება.")
+    return redirect("store:product_detail", product_id=review.product.id)
 
-    for quantity in cart_data.values():
-        try:
-            count += max(0, int(quantity))
-        except (TypeError, ValueError):
-            continue
 
-    return count
 
 
 def home(request):
     products = Product.objects.select_related("category").all()
     categories = Category.objects.all().order_by("name")
+
     brands = (
         Product.objects.order_by("brand")
         .values_list("brand", flat=True)
@@ -70,17 +63,13 @@ def home(request):
 
     if min_price:
         try:
-            products = products.filter(
-                price__gte=Decimal(min_price)
-            )
+            products = products.filter(price__gte=Decimal(min_price))
         except (InvalidOperation, ValueError):
             min_price = ""
 
     if max_price:
         try:
-            products = products.filter(
-                price__lte=Decimal(max_price)
-            )
+            products = products.filter(price__lte=Decimal(max_price))
         except (InvalidOperation, ValueError):
             max_price = ""
 
@@ -88,8 +77,7 @@ def home(request):
         try:
             threshold = float(min_rating)
             products = [
-                product
-                for product in products
+                product for product in products
                 if float(product.average_rating or 0) >= threshold
             ]
         except (ValueError, TypeError):
@@ -105,13 +93,13 @@ def home(request):
         "min_price": min_price,
         "max_price": max_price,
         "min_rating": min_rating,
-        "cart_count": get_cart_count(request),
     })
+
+
 
 
 def product_detail(request, product_id):
     product = get_object_or_404(Product, pk=product_id)
-
     reviews = product.reviews.all().order_by("-created_at")
 
     context = {
@@ -119,10 +107,15 @@ def product_detail(request, product_id):
         "reviews": reviews,
         "review_count": reviews.count(),
         "average_rating": product.average_rating,
-        "cart_count": get_cart_count(request),
     }
 
     return render(request, "store/product_detail.html", context)
+
+
+# -------------------------
+# ADD REVIEW
+# -------------------------
+
 @login_required(login_url="store:login")
 @require_POST
 def add_review(request, product_id):
@@ -139,8 +132,10 @@ def add_review(request, product_id):
 
     if not 1 <= rating <= 5:
         messages.error(request, "Please choose a rating from 1 to 5.")
+
     elif not first_name or not last_name:
         messages.error(request, "Please enter your first and last name.")
+
     else:
         Review.objects.create(
             product=product,
@@ -150,203 +145,216 @@ def add_review(request, product_id):
             rating=rating,
             comment=comment,
         )
+
         messages.success(request, "Your review was submitted successfully!")
 
     return redirect("store:product_detail", product_id=product.id)
 
 
+# -------------------------
+# ADD TO CART
+# -------------------------
+
+@login_required(login_url="store:login")
 @require_POST
 def add_to_cart(request, product_id):
-    product = get_object_or_404(Product, pk=product_id)
 
-    if product.stock < 1:
-        messages.error(request, "This product is out of stock.")
-        return redirect("store:product_detail", product_id=product.id)
+    with transaction.atomic():
 
-    cart_data = request.session.get("cart", {})
-    key = str(product.id)
+        product = get_object_or_404(
+            Product.objects.select_for_update(),
+            pk=product_id
+        )
 
-    try:
-        quantity = int(cart_data.get(key, 0))
-    except (TypeError, ValueError):
-        quantity = 0
+        if product.stock < 1:
+            messages.error(request, "Product is out of stock.")
+            return redirect(
+                "store:product_detail",
+                product_id=product.id
+            )
 
-    if quantity >= product.stock:
-        messages.error(request, "You cannot add more than the available stock.")
-    else:
-        cart_data[key] = quantity + 1
-        request.session["cart"] = cart_data
-        request.session.modified = True
-        messages.success(request, "Product added to your cart.")
+        cart, created = Cart.objects.get_or_create(
+            user=request.user
+        )
 
-    next_url = request.POST.get("next", "")
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart,
+            product=product,
+            defaults={"quantity": 0}
+        )
 
-    if next_url and url_has_allowed_host_and_scheme(
-        next_url,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure(),
-    ):
-        return redirect(next_url)
+        if cart_item.quantity < product.stock:
+            cart_item.quantity += 1
+            cart_item.save(update_fields=["quantity"])
+
+            messages.success(request, "Product added to cart.")
+
+        else:
+            messages.error(request, "Not enough stock.")
 
     return redirect("store:cart")
 
 
+# -------------------------
+# CART PAGE
+# -------------------------
+
+@login_required(login_url="store:login")
 def cart(request):
-    cart_data = request.session.get("cart", {})
-    items = []
-    total = Decimal("0.00")
-    changed = False
 
-    for product_id, raw_quantity in list(cart_data.items()):
-        product = Product.objects.filter(pk=product_id).first()
+    user_cart, created = Cart.objects.get_or_create(
+        user=request.user
+    )
 
-        if product is None or product.stock < 1:
-            cart_data.pop(product_id, None)
-            changed = True
-            continue
+    items = user_cart.items.select_related("product").all()
 
-        try:
-            quantity = int(raw_quantity)
-        except (TypeError, ValueError):
-            quantity = 1
-
-        quantity = max(1, min(quantity, product.stock))
-
-        if cart_data.get(product_id) != quantity:
-            cart_data[product_id] = quantity
-            changed = True
-
-        subtotal = product.price * quantity
-        total += subtotal
-
-        items.append({
-            "product": product,
-            "quantity": quantity,
-            "subtotal": subtotal,
-        })
-
-    if changed:
-        request.session["cart"] = cart_data
-        request.session.modified = True
+    total = sum(
+        (item.subtotal for item in items),
+        Decimal("0.00")
+    )
 
     return render(request, "store/cart.html", {
         "items": items,
         "total": total,
-        "cart_count": sum(item["quantity"] for item in items),
     })
 
 
+
+@login_required(login_url="store:login")
 @require_POST
 def update_cart(request, product_id):
-    product = get_object_or_404(Product, pk=product_id)
-    cart_data = request.session.get("cart", {})
-    key = str(product_id)
+    user_cart = get_object_or_404(Cart, user=request.user)
 
-    if key not in cart_data:
-        return redirect("store:cart")
-
-    try:
-        quantity = int(cart_data[key])
-    except (TypeError, ValueError):
-        quantity = 1
+    cart_item = get_object_or_404(
+        CartItem,
+        cart=user_cart,
+        product_id=product_id
+    )
 
     action = request.POST.get("action")
 
     if action == "increase":
-        if quantity < product.stock:
-            cart_data[key] = quantity + 1
+
+        if cart_item.quantity < cart_item.product.stock:
+            cart_item.quantity += 1
+            cart_item.save(update_fields=["quantity"])
+            messages.success(request, "Quantity increased.")
         else:
-            messages.error(request, "You have reached the available stock limit.")
+            messages.error(request, "Not enough stock available.")
 
     elif action == "decrease":
-        if quantity > 1:
-            cart_data[key] = quantity - 1
-        else:
-            cart_data.pop(key, None)
 
-    request.session["cart"] = cart_data
-    request.session.modified = True
+        if cart_item.quantity > 1:
+            cart_item.quantity -= 1
+            cart_item.save(update_fields=["quantity"])
 
     return redirect("store:cart")
 
 
+
+@login_required(login_url="store:login")
 @require_POST
 def remove_from_cart(request, product_id):
-    cart_data = request.session.get("cart", {})
-    cart_data.pop(str(product_id), None)
 
-    request.session["cart"] = cart_data
-    request.session.modified = True
+    user_cart = get_object_or_404(
+        Cart,
+        user=request.user
+    )
+
+    cart_item = get_object_or_404(
+        CartItem,
+        cart=user_cart,
+        product_id=product_id
+    )
+
+    cart_item.delete()
 
     messages.success(request, "Product removed from cart.")
+
     return redirect("store:cart")
+
 
 
 @login_required(login_url="store:login")
 def checkout(request):
-    cart_data = request.session.get("cart", {})
 
-    if not cart_data:
+    user_cart, created = Cart.objects.get_or_create(
+        user=request.user
+    )
+
+    items = list(
+        user_cart.items.select_related("product").all()
+    )
+
+    if not items:
         messages.error(request, "Your cart is empty.")
         return redirect("store:cart")
 
-    items = []
-    total = Decimal("0.00")
-
-    for product_id, raw_quantity in cart_data.items():
-        product = Product.objects.filter(pk=product_id).first()
-
-        if product is None or product.stock < 1:
-            continue
-
-        try:
-            quantity = int(raw_quantity)
-        except (TypeError, ValueError):
-            continue
-
-        quantity = max(1, min(quantity, product.stock))
-
-        subtotal = product.price * quantity
-        total += subtotal
-
-        items.append({
-            "product": product,
-            "quantity": quantity,
-            "subtotal": subtotal,
-        })
-
-    if not items:
-        messages.error(request, "Your cart has no available products.")
-        return redirect("store:cart")
+    total = sum(
+        (item.subtotal for item in items),
+        Decimal("0.00")
+    )
 
     if request.method == "POST":
-        request.session["cart"] = {}
-        request.session.modified = True
+
+        with transaction.atomic():
+
+         
+            for item in items:
+
+                product = Product.objects.select_for_update().get(
+                    pk=item.product_id
+                )
+
+                if product.stock < item.quantity:
+                    messages.error(
+                        request,
+                        f"Not enough stock for {product.name}."
+                    )
+                    return redirect("store:cart")
+
+      
+            for item in items:
+
+                product = Product.objects.select_for_update().get(
+                    pk=item.product_id
+                )
+
+                product.stock -= item.quantity
+                product.save(update_fields=["stock"])
+
+            
+            user_cart.items.all().delete()
+
+        messages.success(request, "Your order was submitted successfully!")
 
         return render(request, "store/checkout.html", {
             "items": [],
             "total": total,
-            "cart_count": 0,
             "order_success": True,
         })
 
     return render(request, "store/checkout.html", {
         "items": items,
         "total": total,
-        "cart_count": get_cart_count(request),
     })
 
 
+
+
 def register(request):
+
     if request.user.is_authenticated:
         return redirect("store:home")
 
     if request.method == "POST":
+
         form = UserCreationForm(request.POST)
 
         if form.is_valid():
             user = form.save()
             login(request, user)
+
             return redirect("store:home")
 
     else:
